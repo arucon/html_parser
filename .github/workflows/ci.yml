@@ -1,0 +1,35 @@
+name: Verify legacy HTML parser
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Run the parser against an offline HTML fixture in Python 2.7
+        run: |
+          docker run --rm -i --network none -v "$PWD:/source:ro" python:2.7.18-slim-buster@sha256:6c1ffdff499e29ea663e6e67c9b6b9a3b401d554d2c9f061f9a45344e3992363 python - <<'PYTHON'
+          import sys
+          sys.path.insert(0, '/source')
+          from html_parser import HTMLParser
+
+          with open('/tmp/sample.html', 'w') as sample:
+              sample.write('<p>b2A1</p>')
+          chunks, remainder = HTMLParser('file:///tmp/sample.html', 'html', 3).run()
+          assert chunks == [['A', '1', 'b']], chunks
+          assert remainder == ['2'], remainder
+          PYTHON
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: html-parser-source
+          path: html_parser.py
+          if-no-files-found: error
+          retention-days: 14
